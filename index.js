@@ -17,13 +17,19 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     const categoriesCollection = client.db("buySell").collection("categories");
+    const usersCollection = client.db("buySell").collection("users");
 
     app.get("/category/:id", async (req, res) => {
       const id = req.params.id;
-      const filter={ctg_id:id}
-      const result=await categoriesCollection.find(filter).toArray();
-      res.send(result)
-      
+      const filter = { ctg_id: id };
+      const result = await categoriesCollection.find(filter).toArray();
+      res.send(result);
+    });
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      // console.log(user);
+      const result = await usersCollection.insertOne(user);
+      res.send(result);
     });
   } finally {
   }
