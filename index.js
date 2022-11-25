@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const app = express();
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 require("dotenv").config();
 app.use(cors());
@@ -20,10 +20,112 @@ async function run() {
   try {
     const categoriesCollection = client.db("buySell").collection("categories");
     const usersCollection = client.db("buySell").collection("users");
+    const bookedCarsCollection = client.db("buySell").collection("bookedCar");
+
+    app.post("/sellarAddCar", async (req, res) => {
+      const addCar = req.body;
+      const result = await categoriesCollection.insertOne(addCar);
+      res.send(result);
+    });
+
+    app.put("/verify/:id", async (req, res) => {
+      const id = req.params.id;
+      console.log(id);
+      const query = { _id: ObjectId(id) };
+      const loginSellers = await categoriesCollection.find(query).toArray();
+      const upsert = true;
+      const updateDoc = {
+        $set: {
+          sellarVerified: true,
+        },
+      };
+      const result = await categoriesCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+    app.get("/getallthesellars", async (req, res) => {
+      const query = { role: "seller" };
+      const result = await usersCollection.find(query).toArray();
+      const filter = {};
+      const allUsers = await categoriesCollection.find(filter).toArray();
+      const allSellars = result.map((allSellar) => {
+        const Sellars = allUsers.filter(
+          (allUser) => allUser.email === allSellar.email
+        );
+      });
+
+      res.send(allUsers);
+    });
+
+    app.delete("/mydeleteproduct/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+      const result = await categoriesCollection.deleteOne(filter);
+      res.send(result);
+    });
+
+    app.delete("/userdelete/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+      const result = await bookedCarsCollection.deleteOne(filter);
+      res.send(result);
+    });
+
+    app.get("/getalltheusers", async (req, res) => {
+      const query = {};
+      const result = await bookedCarsCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    app.get("/getpayment/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+      const result = await bookedCarsCollection.findOne(filter);
+      res.send(result);
+    });
+
+    app.get("/getBookedCar", async (req, res) => {
+      const email = req.query.email;
+      console.log(email);
+      const filter = { email: email };
+      const result = await bookedCarsCollection.find(filter).toArray();
+      res.send(result);
+    });
+    app.get("/myproduct", async (req, res) => {
+      const email = req.query.email;
+
+      console.log(email);
+      const filter = { email: email };
+      const result = await categoriesCollection.find(filter).toArray();
+      res.send(result);
+    });
+
+    app.post("/bookedCar", async (req, res) => {
+      const car = req.body;
+      const result = await bookedCarsCollection.insertOne(car);
+      res.send(result);
+    });
+
+    app.get("/user/wanted", async (req, res) => {
+      const email = req.query.email;
+      const filter = { email: email };
+      const result = await usersCollection.findOne(filter);
+
+      if (result.role === "seller") {
+        return res.send({ message: "sellar" });
+      }
+      if (result.role === "user") {
+        return res.send({ message: "user" });
+      }
+      if (result.role === "admin") {
+        return res.send({ message: "admin" });
+      }
+      res.send({ message: "" });
+    });
 
     app.get("/category/:id", async (req, res) => {
       const id = req.params.id;
-      const filter = { ctg_id: id };
+      const filter = { product_id: id };
       const result = await categoriesCollection.find(filter).toArray();
       res.send(result);
     });
@@ -36,15 +138,15 @@ async function run() {
         const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
           expiresIn: "10h",
         });
-        console.log(token);
+        // console.log(token);
         return res.send({ accessToken: token });
       }
-      res.status(403).send({accessToken:"Error accured"});
+      res.status(403).send({ accessToken: "Error accured" });
     });
 
     app.post("/users", async (req, res) => {
       const user = req.body;
-      console.log(user);
+      // console.log(user);
       const result = await usersCollection.insertOne(user);
       res.send(result);
     });
