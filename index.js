@@ -70,7 +70,7 @@ async function run() {
       const result = await bookedCarsCollection.deleteOne(filter);
       res.send(result);
     });
-
+okay
     app.get("/getalltheusers", async (req, res) => {
       const query = {};
       const result = await bookedCarsCollection.find(query).toArray();
