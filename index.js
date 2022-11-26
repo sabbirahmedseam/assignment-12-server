@@ -1,9 +1,11 @@
 const express = require("express");
+require("dotenv").config();
+
 const cors = require("cors");
 const app = express();
+const stripe = require("stripe")(process.env.STRIPE_SECRET);
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
-require("dotenv").config();
 app.use(cors());
 const jwt = require("jsonwebtoken");
 app.use(express.json());
@@ -21,6 +23,8 @@ async function run() {
     const categoriesCollection = client.db("buySell").collection("categories");
     const usersCollection = client.db("buySell").collection("users");
     const bookedCarsCollection = client.db("buySell").collection("bookedCar");
+    const paymentsCollection = client.db("buySell").collection("payments");
+    const advertiseCollection = client.db("buySell").collection("advertise");
 
     app.post("/sellarAddCar", async (req, res) => {
       const addCar = req.body;
@@ -30,7 +34,7 @@ async function run() {
 
     app.put("/verify/:id", async (req, res) => {
       const id = req.params.id;
-      console.log(id);
+      // console.log(id);
       const query = { _id: ObjectId(id) };
       const loginSellers = await categoriesCollection.find(query).toArray();
       const upsert = true;
@@ -70,7 +74,7 @@ async function run() {
       const result = await bookedCarsCollection.deleteOne(filter);
       res.send(result);
     });
-okay
+
     app.get("/getalltheusers", async (req, res) => {
       const query = {};
       const result = await bookedCarsCollection.find(query).toArray();
@@ -86,23 +90,35 @@ okay
 
     app.get("/getBookedCar", async (req, res) => {
       const email = req.query.email;
-      console.log(email);
+      // console.log(email);
       const filter = { email: email };
       const result = await bookedCarsCollection.find(filter).toArray();
-      res.send(result);
-    });
-    app.get("/myproduct", async (req, res) => {
-      const email = req.query.email;
-
-      console.log(email);
-      const filter = { email: email };
-      const result = await categoriesCollection.find(filter).toArray();
       res.send(result);
     });
 
     app.post("/bookedCar", async (req, res) => {
       const car = req.body;
+      const resale_id = car.resale_product_id;
       const result = await bookedCarsCollection.insertOne(car);
+      const filter = { _id: ObjectId(resale_id) };
+      const updatedDoc = {
+        $set: {
+          resale: true,
+        },
+      };
+      const updatedResult = await categoriesCollection.updateOne(
+        filter,
+        updatedDoc
+      );
+
+      res.send(updatedResult);
+    });
+    app.get("/myproduct", async (req, res) => {
+      const email = req.query.email;
+
+      // console.log(email);
+      const filter = { email: email };
+      const result = await categoriesCollection.find(filter).toArray();
       res.send(result);
     });
 
@@ -130,6 +146,38 @@ okay
       res.send(result);
     });
 
+    app.post("/create-payment-intent", async (req, res) => {
+      const booking = req.body;
+      const price = booking.price;
+      const amount = price * 100;
+      const paymentIntent = await stripe.paymentIntents.create({
+        currency: "usd",
+        amount: amount,
+        payment_method_types: ["card"],
+      });
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
+    });
+
+    app.post("/payments", async (req, res) => {
+      const payment = req.body;
+      const result = await paymentsCollection.insertOne(payment);
+      const id = payment.bookingId;
+      const filter = { _id: ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          paid: true,
+          transactionId: payment.transactionId,
+        },
+      };
+      const updatedResult = await bookedCarsCollection.updateOne(
+        filter,
+        updatedDoc
+      );
+      res.send(updatedResult);
+    });
+
     app.get("/jwt", async (req, res) => {
       const email = req.query.email;
       const query = { email: email };
@@ -142,6 +190,28 @@ okay
         return res.send({ accessToken: token });
       }
       res.status(403).send({ accessToken: "Error accured" });
+    });
+
+    // addvertise part
+
+    app.get("/getadvertise", async (req, res) => {
+      const query = {};
+      const result = await advertiseCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    app.delete("/deleteadvertiseitem/:id", async (req, res) => {
+      const id = req.params.id;
+      console.log(id);
+      const filter = { _id: ObjectId(id) };
+      const result = await advertiseCollection.deleteOne(filter);
+      res.send(result);
+    });
+    app.post("/advertise", async (req, res) => {
+      const car = req.body;
+      console.log(car);
+      const result = await advertiseCollection.insertOne(car);
+      res.send(result);
     });
 
     app.post("/users", async (req, res) => {
